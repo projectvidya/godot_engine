@@ -45,6 +45,25 @@ Error FileAccessEncrypted::open_and_parse(Ref<FileAccess> p_base, const Vector<u
 	ERR_FAIL_COND_V_MSG(file.is_valid(), ERR_ALREADY_IN_USE, vformat("Can't open file while another file from path '%s' is open.", file->get_path_absolute()));
 	ERR_FAIL_COND_V(p_key.size() != 32, ERR_INVALID_PARAMETER);
 
+	Vector<uint8_t> temp_key = p_key.slice(0, 8);
+	temp_key.reverse();
+	Vector<uint8_t> temp_key2 = p_key.slice(7, 16);
+	temp_key2.reverse();
+	Vector<uint8_t> temp_key3 = p_key.slice(15, 24);
+	temp_key3.reverse();
+	Vector<uint8_t> temp_key4 = p_key.slice(23, 32);
+	temp_key4.reverse();
+
+	Vector<uint8_t> key_temp;
+	key_temp.append_array(temp_key3);
+	key_temp.append_array(temp_key);
+	key_temp.append_array(temp_key2);
+	key_temp.append_array(temp_key4);
+	key_temp = key_temp.slice(0, 32);
+
+	ERR_FAIL_COND_V(key_temp.size() != 32, ERR_INVALID_PARAMETER);
+	// abcd efgh ijkl mnop => lkij dcba hgfe ponm
+
 	pos = 0;
 	eofed = false;
 	use_magic = p_with_magic;
@@ -53,7 +72,7 @@ Error FileAccessEncrypted::open_and_parse(Ref<FileAccess> p_base, const Vector<u
 		data.clear();
 		writing = true;
 		file = p_base;
-		key = p_key;
+		key = key_temp;
 		if (p_iv.is_empty()) {
 			iv.resize(16);
 			if (unlikely(!_fae_static_rng)) {
@@ -73,7 +92,7 @@ Error FileAccessEncrypted::open_and_parse(Ref<FileAccess> p_base, const Vector<u
 
 	} else if (p_mode == MODE_READ) {
 		writing = false;
-		key = p_key;
+		key = key_temp;
 
 		if (use_magic) {
 			uint32_t magic = p_base->get_32();
